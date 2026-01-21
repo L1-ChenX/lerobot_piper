@@ -13,6 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
+# 必须在导入 transformers 或 tokenizers 之前设置
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import dataclasses
 import logging
 import time
@@ -425,6 +430,15 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
                 wandb_log_dict = train_tracker.to_dict()
                 if output_dict:
                     wandb_log_dict.update(output_dict)
+
+                # 手动取出 loss_per_dim 列表，拆解为单独的数值，并从原字典中删除
+                if "loss_per_dim" in wandb_log_dict:
+                    # pop() 会返回列表并从字典中移除该 Key，从而消除 Warning
+                    dim_losses = wandb_log_dict.pop("loss_per_dim")
+                    if isinstance(dim_losses, list):
+                        for i, val in enumerate(dim_losses):
+                            wandb_log_dict[f"loss_dim_{i}"] = val
+                            
                 # Log RA-BC statistics if enabled
                 if rabc_weights is not None:
                     rabc_stats = rabc_weights.get_stats()

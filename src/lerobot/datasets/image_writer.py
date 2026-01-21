@@ -43,14 +43,23 @@ def image_array_to_pil_image(image_array: np.ndarray, range_check: bool = True) 
     if image_array.ndim != 3:
         raise ValueError(f"The array has {image_array.ndim} dimensions, but 3 is expected for an image.")
 
-    if image_array.shape[0] == 3:
+    if image_array.shape[0] in [1, 3]:
         # Transpose from pytorch convention (C, H, W) to (H, W, C)
         image_array = image_array.transpose(1, 2, 0)
 
+    # --- 移除 "3通道" 的强制检查，改为处理单通道 ---
+    if image_array.shape[-1] == 1:
+        # 如果是单通道 (H, W, 1)，压缩为 2D (H, W) 以供 PIL 使用
+        image_array = image_array.squeeze(-1)
     elif image_array.shape[-1] != 3:
         raise NotImplementedError(
-            f"The image has {image_array.shape[-1]} channels, but 3 is required for now."
+            f"The image has {image_array.shape[-1]} channels, but 1 or 3 is required."
         )
+
+    # --- 专门处理 uint16 深度图 ---
+    if image_array.dtype == np.uint16:
+        # 直接返回 I;16 模式的图像，跳过后续的 uint8 压缩
+        return PIL.Image.fromarray(image_array, mode="I;16")
 
     if image_array.dtype != np.uint8:
         if range_check:
